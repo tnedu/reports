@@ -28,7 +28,8 @@ psdata <- read_csv("K:\\Research and Policy\\projects\\hs_feedback_report\\Deriv
 dist <- psdata %>%
     filter(districtno == 350) %>%
     mutate(pct_enroll = round(100 * enroll_bin/hsgrad, 1)) %>%
-    mutate(pct_enroll_state = round(100 * enroll_state/hsgrad_state))
+    mutate(pct_enroll_state = round(100 * enroll_state/hsgrad_state),
+           GradYear = cohortyear+4)
 
 distname <- subset(dist, page == "4" & institution_level == "Four-year University")
 
@@ -38,6 +39,7 @@ comp3 <- distname$similar_district_3
 comp4 <- distname$similar_district_4
 comp5 <- distname$similar_district_5
 districtname <- "Random District"
+rm(distname)
 
 ```
 
@@ -93,26 +95,78 @@ For some topics, comparing a school district's data to statewide trends is not i
 
 *   What are the general enrollment trends in my district?
  
-```{r Figure 3a, fig.height = 4, fig.width = 6, fig.align = 'center'}
+```{r Figure 3anum, fig.height = 4, fig.width = 6, fig.align = 'center'}
+lim<-dist %>%
+    filter(page == "3a") %>%
+    group_by() %>% 
+  summarise(`Number Graduates` = max(hsgrad)) %>% 
+      select(`Number Graduates`)
+
 dist %>%
     filter(page == "3a") %>%
-    ggplot(aes(x = as.factor(cohortyear), y = pct_enroll, fill = as.factor(cohortyear))) +
+      ggplot(aes(x = as.factor(GradYear), y = enroll_bin, fill = as.factor(GradYear))) +
         geom_bar(stat = "identity", position = position_dodge(), width = .75) +
-        geom_text(aes(label = pct_enroll), vjust = -1) +
+        geom_text(aes(label = enroll_bin), vjust = -1) +
         theme_hc() +
         theme(axis.text.y = element_text(size=rel(1.25), family = "serif"),
             axis.text.x = element_text(size=rel(1.5), family = "serif", face = "bold"),
             plot.title = element_text(size=rel(1.5), family = "serif")) +
-        scale_fill_manual(name = "Cohort Year", values = c("#e02f11", "#24336b", "#959595")) +
-        ylab("Percent of graduates who enrolled \n in any postsecondary institution") +
-        xlab("Graduating Cohort Year") +
+        scale_fill_manual(name = "Graduation Year", values = c("#e02f11", "#24336b", "#959595")) +
+        ylab("Number of graduates who enrolled \n in any postsecondary institution") +
+        xlab("Graduation Year") +
         ggtitle("Postsecondary Enrollment by Cohort Year") +
+        ylim(0, lim$`Number Graduates`)
+```
+
+```{r Figure 3apct, fig.height = 4, fig.width = 6, fig.align = 'center'}
+
+StateRate <- dist %>% 
+    filter(page == "3a" & cohortyear == 2011) %>%
+  mutate(max_rate =  if_else(pct_enroll>=pct_enroll_state, pct_enroll, pct_enroll_state)) %>%
+    select(pct_enroll_state, GradYear, max_rate)
+
+
+dist %>%
+    filter(page == "3a") %>%
+    ggplot(aes(x = as.factor(GradYear ), y = pct_enroll, fill = as.factor(cohortyear))) +
+        geom_bar(stat = "identity", position = position_dodge(), width = .75, colour="black") +
+        geom_text(aes(label = pct_enroll), vjust = -1) +
+        geom_hline(aes(yintercept = StateRate$pct_enroll_state), linetype=2 ) +
+        geom_bar(aes(x=as.factor(GradYear), y=pct_enroll_state),stat="identity",position=position_dodge()) +
+        theme_hc() +
+        theme(axis.text.y = element_text(family = "serif"),
+            axis.text.x = element_text( family = "serif", face = "bold"),
+            plot.title = element_text(family = "serif")) +
+        scale_fill_manual(name = "Graduation Year", values = c("#e02f11", "#24336b", "#959595")) +
+        annotate("text", x="2014", y=(StateRate$max_rate+20), 
+                  label =paste("2015 State PS Enrollment Rate: ", StateRate$pct_enroll_state, "%"),fontface="italic") +
+      ylab("Percent of graduates who enrolled \n in any postsecondary institution") +
+        xlab("Graduation Year") +
+        ggtitle("Postsecondary Enrollment by Graduation Year") +
         ylim(0, 100)
 ```
 
 *   What type of institutions are my students enrolling in?
 
 *   Percent of graduates who enrolled, by type of institution 
+```{r Figure 3bnum, fig.height = 4, fig.width = 6, fig.align = 'center'}
+dist %>%
+    filter(page == "3b" & !is.na(institution_level)) %>%
+    ggplot(aes(x = institution_level, y = enroll_bin, fill = institution_level)) + 
+        geom_bar(stat = "identity", position = "stack", width = .75) +
+        geom_text(aes(label = enroll_bin), vjust = -1) +
+        theme_hc() +
+        theme(axis.text.y = element_text(size = rel(1.25), family = "serif"),
+            axis.text.x = element_text(size = rel(1.25), family = "serif", face = "bold"),
+            plot.title = element_text(size = rel(1.5), family = "serif")) +
+        scale_fill_manual(name = "Institution Level", values = c("#e02f11", "#24336b", "#959595")) + 
+        ylab("Percent of high school graduates who enrolled in \n postsecondary institution") +
+        xlab("Institution Level") +
+        ggtitle("Postsecondary Enrollment by Institution Type \n 2015 On-time Graduates") +
+        ylim(0, lim$`Number Graduates`)
+```
+
+
 ```{r Figure 3b, fig.height = 4, fig.width = 6, fig.align = 'center'}
 dist %>%
     filter(page == "3b" & !is.na(institution_level)) %>%
@@ -121,9 +175,9 @@ dist %>%
         geom_bar(stat = "identity", position = "stack", width = .75) +
         geom_text(aes(label = ps_pct_enroll), vjust = -1) +
         theme_hc() +
-        theme(axis.text.y = element_text(size = rel(1.25), family = "serif"),
-            axis.text.x = element_text(size = rel(1.25), family = "serif", face = "bold"),
-            plot.title = element_text(size = rel(1.5), family = "serif")) +
+        theme(axis.text.y = element_text(family = "serif"),
+            axis.text.x = element_text( family = "serif", face = "bold"),
+            plot.title = element_text(family = "serif")) +
         scale_fill_manual(name = "Institution Level", values = c("#e02f11", "#24336b", "#959595")) + 
         ylab("Percent of high school graduates who enrolled in \n postsecondary institution") +
         xlab("Institution Level") +
