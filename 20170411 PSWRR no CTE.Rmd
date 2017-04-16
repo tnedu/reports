@@ -3,11 +3,11 @@ output:
   pdf_document:
     fig_caption: yes
     keep_tex: yes
-    # latex_engine: lualatex
+    latex_engine: xelatex
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 title: "Postsecondary and Workforce Readiness Reports"
-subtitle: "Random District"
-geometry: margin = 1in
+# subtitle: "Random District"
+geometry: margin = .75in
 fontfamily: mathpazo
 fontsize: 11pt
 spacing: double
@@ -27,20 +27,22 @@ psdata <- read_csv("K:/Research and Policy/projects/hs_feedback_report/Derived D
 
 dist <- psdata %>%
     filter(districtno == 350) %>%
-    mutate(pct_enroll = round(100 * enroll_bin/hsgrad, 1),
+    mutate(pct_enroll = round(100 * enroll_bin/hsgrad_denom, 1),
         pct_enroll_state = round(100 * enroll_state/hsgrad_state),
         GradYear = cohortyear + 4,
         pctElab = as.character(ifelse(pct_enroll >= 5, pct_enroll, "")),
-        Elab = as.factor(ifelse(hsgrad < 10, "< 10", enroll_bin)))
+        Elab = as.factor(ifelse(hsgrad_denom < 10, "< 10", enroll_bin)),
+        institution_type = ordered(institution_level, levels = c("Four-year University", "Community College", "Technical College", "Did not enroll")))
 
-distname <- subset(dist, page == "4" & institution_level == "Four-year University")
+
+distname <- subset(dist, page == "4" & institution_type == "Four-year University")
 
 comp1 <- distname$similar_district_1
 comp2 <- distname$similar_district_2
 comp3 <- distname$similar_district_3
 comp4 <- distname$similar_district_4
 comp5 <- distname$similar_district_5
-districtname <- "Random District"
+districtname <- distname$districtname
 rm(distname)
 
 ```
@@ -59,15 +61,15 @@ This page will contain a series of figures that in a clean way display for the m
 *   Average ACT scores
 <!-- *   Regional Alignment of Program of Studies available -->
 
-**Most Common Insitutions**
+**Top Five Most Common Insitutions**
 ```{r, echo = FALSE}
 # Do I want to show this by school?
 dist %>%
-    filter(page == "8" & enroll_bin >= 5 & !is.na(institution_level)) %>%
+    filter(page == "8" & enroll_bin >= 5 & institution_type!= "Did not enroll") %>%
     arrange(desc(enroll_bin)) %>%
     slice(1:5) %>%
     transmute(`Institution Name` = ps_institution_name, `Number of Enrollees` = enroll_bin) %>%
-    knitr::kable()
+    knitr::kable()  
 ```
 
 ## Overview of what we want to show.
@@ -91,12 +93,9 @@ For some topics, comparing a school district's data to statewide trends is not i
 |`r districtname`| `r comp1` | `r comp2` | `r comp3` | `r comp4` | `r comp5` |
 
 \newpage
-
-#### Key questions
-
-*   What are the general enrollment trends in my district?
- 
-```{r Enrollment over time, fig.height = 4, fig.width = 6, fig.align = 'center'}
+#### Key questions  
+*   What are the general enrollment trends in my district?  
+```{r Enrollment over time, fig.height = 3.75, fig.width = 6, fig.align = 'center'}
 
 StateRate <- dist %>%
     filter(page == "3a" & cohortyear == 2011) %>%
@@ -104,10 +103,11 @@ StateRate <- dist %>%
     select(pct_enroll_state, GradYear, max_rate)
 
 dist %>%
-    filter(page == "3a") %>%
-    ggplot(aes(x = as.factor(GradYear), y = pct_enroll, fill = as.factor(GradYear))) +
+    filter(page == "3a")  %>% mutate(`Percent Enroll` = round(100*enroll_bin/hsgrad,1),
+                                     pctElab = as.character(ifelse(`Percent Enroll` >= 5, `Percent Enroll`, "")),         Elab = as.factor(ifelse(hsgrad < 10, "< 10", enroll_bin))) %>% 
+    ggplot(aes(x = as.factor(GradYear), y = `Percent Enroll`, fill = as.factor(GradYear))) +
         geom_bar(stat = "identity", position = position_dodge(-1), width = .75, colour = "black") +
-        geom_text(aes(label = paste0(pctElab, "%\n N =", Elab), vjust = -.5)) +
+        geom_text(aes(label = paste0(pctElab, "%\n N =", hsgrad), vjust = -.5)) +
         geom_hline(aes(yintercept = StateRate$pct_enroll_state), linetype=2) +
         # geom_bar(aes(x=as.factor(GradYear), y=pct_enroll_state),stat="identity",position=position_dodge(.5), width = .25) +
         theme_hc() +
@@ -122,21 +122,18 @@ dist %>%
         ggtitle("Postsecondary Enrollment by Graduation Year") +
         ylim(0, 100)
 ```
-
 *   What type of institutions are my students enrolling in?
-
-*   Percent of graduates who enrolled, by type of institution 
-```{r District by Type, fig.height = 4, fig.width = 6, fig.align = 'center'}
+```{r District by Type, fig.height = 3.75, fig.width = 6, fig.align = 'center'}
 StateRate3b <- dist %>%
-    filter(page == "3b" & !is.na(institution_level) & cohortyear == 2011) %>%
-    select(pct_enroll_state, institution_level)
+    filter(page == "3b" & institution_type!= "Did not enroll" & cohortyear == 2011) %>%
+    select(pct_enroll_state, institution_type)
 
 dist %>%
-    filter(page == "3b" & !is.na(institution_level)) %>%
+    filter(page == "3b" & institution_type!= "Did not enroll") %>%
     mutate(ps_pct_enroll = round(100 * enroll_bin/hsgrad_denom, 1)) %>%
     mutate(pctElab = as.factor(ifelse(ps_pct_enroll>= 5, ps_pct_enroll, "*")),
         Elab = as.factor(ifelse(hsgrad < 10, "< 10",enroll_bin))) %>%
-    ggplot(aes(x = institution_level, y = ps_pct_enroll, fill = institution_level)) +
+    ggplot(aes(x = institution_type, y = ps_pct_enroll, fill = institution_type)) +
         geom_bar(stat = "identity", position = position_dodge(-1), width = .75, colour="black") +
         geom_text(aes(label = paste0(pctElab, "%\n N=", Elab), vjust = -.5)) +
         theme_hc() +
@@ -144,7 +141,7 @@ dist %>%
             axis.text.x = element_text( family = "serif"),
             plot.title = element_text(family = "serif")) +
         scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595")) +
-        annotate("text", x = StateRate3b$institution_level, y = 95,
+        annotate("text", x = StateRate3b$institution_type, y = 95,
             label = paste("TN:", StateRate3b$pct_enroll_state, "%"), fontface="italic") +
         ylab("Percent of high school graduates who enrolled in postsecondary institution") +
         xlab("Institution Type") +
@@ -153,8 +150,39 @@ dist %>%
 ```
 
 \newpage
+### Most Common Institutions
 
-**District Comparisons**
+The following table shows the most common institutions that students from the 2015 graduating class enrolled in within 12 months of graduation.  
+
+Consider opportunities for an external partnership with the institution and where students have been successful. Some questions that you may want to consider:
+
+*   Are students enrolling in institutions that are nearest to your school? 
+*   Have students taken dual enrollment courses or attended summer programs  at these institutions while in high school?
+*   Are students in your school aware of the majors offered at these institutions? 
+*   Do your programs of study align with opportunities at these institutions?  
+```{r most_common_institutions, echo = FALSE}
+EnrOther<-dist %>%
+    filter(page == "8" & institution_type!= "Did not enroll" & enroll_bin<5) %>%
+    group_by(institution_type, hsgrad_denom) %>% 
+    summarise(`Number of Enrollees` = sum(enroll_bin)) %>%
+    ungroup() %>% 
+    mutate(`Percent of Graduates`=round(100 * `Number of Enrollees`/hsgrad_denom, 1),`Institution Name` = if_else(institution_type =="Four-year University", "Other Four-year Universities", paste("Other ",institution_type,"s", sep=""))) %>% 
+    group_by(`Institution Name`) %>% 
+  arrange(desc(`Number of Enrollees`)) %>% select(-institution_type,-hsgrad_denom) 
+# Do I want to show this by school?
+dist %>%
+    filter(page == "8" & enroll_bin >= 5 & institution_type!= "Did not enroll") %>%
+    arrange(desc(enroll_bin)) %>%
+    slice(1:15) %>%
+    transmute(`Institution Name` = ps_institution_name, `Number of Enrollees` = enroll_bin, `Percent of Graduates`= pct_enroll) %>%
+  arrange(desc(`Number of Enrollees`)) %>%
+    bind_rows(EnrOther) %>%
+    knitr::kable()
+```
+
+\newpage 
+
+### District Comparisons
 
 #### Key Questions
 *   How does the overall enrollment compare to similar districts in terms of overall postsecondary enrollment?
@@ -163,91 +191,97 @@ dist %>%
 *   How does the enrollment into different institution types compare to the state distribution of enrollment into institution types?
 
 ```{r comparison_districts}
-
 district_order <- dist %>%
-    filter(page == "4" & institution_level == "Four-year University") %>%
+    filter(page == "4" & institution_type == "Four-year University") %>%
     select(districtname, similar_district_1, similar_district_2, similar_district_3, similar_district_4, similar_district_5) %>%
+    distinct() %>% 
     t() %>%
     as_data_frame() %>%
     magrittr::extract2(1) %>%
     c("State")
 
 master <- dist %>%
-    filter(page == "4") %>%
-    transmute(institution_level, `Similar District` = districtname, pct_enroll, `NumEnroll`=sum(enroll_bin), pctElab = as.factor(ifelse(pct_enroll >= 5, pct_enroll, "")))
+    filter(page == "4" & institution_type != "Did not enroll") %>%
+    transmute(institution_type, `Similar District` = districtname, pct_enroll, `NumEnroll`=sum(enroll_bin), pctElab = as.factor(ifelse(pct_enroll >= 5, pct_enroll, "")))
 
 similar_1 <- dist %>%
-    filter(page == "4") %>%
-    transmute(institution_level, `Similar District` = similar_district_1, pct_enroll = round(100 * enroll_bin1/hsgrad_denom1, 1), `NumEnroll`=sum(enroll_bin1), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
+    filter(page == "4" & institution_type != "Did not enroll") %>%
+    transmute(institution_type, `Similar District` = similar_district_1, pct_enroll = round(100 * enroll_bin1/hsgrad_denom1, 1), `NumEnroll`=sum(enroll_bin1), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
 
 similar_2 <- dist %>%
-    filter(page == "4") %>%
-    transmute(institution_level, `Similar District` = similar_district_2, pct_enroll = round(100 * enroll_bin2/hsgrad_denom2, 1), `NumEnroll`=sum(enroll_bin2), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
+    filter(page == "4" & institution_type != "Did not enroll") %>%
+    transmute(institution_type, `Similar District` = similar_district_2, pct_enroll = round(100 * enroll_bin2/hsgrad_denom2, 1), `NumEnroll`=sum(enroll_bin2), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
 
 similar_3 <- dist %>%
-    filter(page == "4") %>%
-    transmute(institution_level, `Similar District` = similar_district_3, pct_enroll = round(100 * enroll_bin3/hsgrad_denom3, 1), `NumEnroll`=sum(enroll_bin3), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
+    filter(page == "4" & institution_type != "Did not enroll") %>%
+    transmute(institution_type, `Similar District` = similar_district_3, pct_enroll = round(100 * enroll_bin3/hsgrad_denom3, 1), `NumEnroll`=sum(enroll_bin3), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
 
 if (length(na.omit(dist$similar_district_4)) != 0) {
     similar_4 <- dist %>%
-        filter(page == "4") %>%
-        transmute(institution_level, `Similar District` = similar_district_4, pct_enroll = round(100 * enroll_bin4/hsgrad_denom4, 1), `NumEnroll`=sum(enroll_bin4), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
+        filter(page == "4" & institution_type != "Did not enroll") %>%
+        transmute(institution_type, `Similar District` = similar_district_4, pct_enroll = round(100 * enroll_bin4/hsgrad_denom4, 1), `NumEnroll`=sum(enroll_bin4), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
 }
 
 if (length(na.omit(dist$similar_district_5)) != 0) {
     similar_5 <- dist %>%
-        filter(page == "4") %>%
-        transmute(institution_level, `Similar District` = similar_district_5, pct_enroll = round(100 * 
+        filter(page == "4" & institution_type != "Did not enroll") %>%
+        transmute(institution_type, `Similar District` = similar_district_5, pct_enroll = round(100 * 
             as.numeric(enroll_bin5)/as.numeric(hsgrad_denom5), 1), NumEnroll = sum(as.numeric(enroll_bin5)), pctElab = as.factor(ifelse(pct_enroll >= 5, pct_enroll, "")))
 }
 
 state <- dist %>%
-    filter(page == "4") %>%
-    transmute(institution_level, `Similar District` = "State", pct_enroll = pct_enroll_state, NumEnroll = sum(enroll_state), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
+    filter(page == "4" & institution_type != "Did not enroll") %>%
+    transmute(institution_type, `Similar District` = "State", pct_enroll = pct_enroll_state, NumEnroll = sum(enroll_state), pctElab = as.factor(ifelse(pct_enroll>= 5, pct_enroll, "")))
 
 if (exists("similar_4") & exists("similar_5")) {
     all_districts <- bind_rows(master, similar_1, similar_2, similar_3, similar_4, similar_5, state) %>%
+      filter(institution_type != "Did not enroll") %>% 
         select(-c(pctElab, NumEnroll)) %>% 
-        spread(institution_level, pct_enroll)
+        spread(institution_type, pct_enroll)
 }
 
 if (exists("similar_4") & !exists("similar_5")) {
     all_districts <- bind_rows(master, similar_1, similar_2, similar_3, similar_4,  state) %>%
+      filter(institution_type != "Did not enroll") %>% 
       select(-c(pctElab, NumEnroll)) %>% 
-        spread(institution_level, pct_enroll)
+        spread(institution_type, pct_enroll)
 }
 
 if (!exists("similar_4") & !exists("similar_5")) {
     all_districts <- bind_rows(master, similar_1, similar_2, similar_3, similar_4, state) %>%
+      filter(institution_type != "Did not enroll") %>% 
         select(-c(pctElab, NumEnroll)) %>% 
-        spread(institution_level, pct_enroll)
+        spread(institution_type, pct_enroll)
 }
 
 # Generating labels
 if (exists("similar_4") & exists("similar_5")) {
-    all_districts_lab <- bind_rows(master, similar_1, similar_2, similar_3, similar_4, similar_5, state)%>%
+    all_districts_lab <- bind_rows(master, similar_1, similar_2, similar_3, similar_4, similar_5, state) %>%
+      filter(institution_type != "Did not enroll") %>% 
         select(-pct_enroll) %>% 
-        spread(institution_level, pctElab)
+        spread(institution_type, pctElab)
 }
 
 if (exists("similar_4") & !exists("similar_5")) {
     all_districts_lab <- bind_rows(master, similar_1, similar_2, similar_3, similar_4, state) %>%
+      filter(institution_type != "Did not enroll") %>% 
         select(-pct_enroll) %>% 
-        spread(institution_level, pctElab)
+        spread(institution_type, pctElab)
 }
 
 if (!exists("similar_4") & !exists("similar_5")) {
     all_districts_lab <- bind_rows(master, similar_1, similar_2, similar_3, similar_4, state) %>%
+      filter(institution_type != "Did not enroll") %>% 
         select(-pct_enroll) %>% 
-        spread(institution_level, pctElab)
+        spread(institution_type, pctElab)
 }
 
 all_districts_lab1 <- all_districts_lab %>%
-    gather(institution_level, `Percent Enrolled`, -c(`Similar District`, NumEnroll))
+    gather(institution_type, `Percent Enrolled`, -c(`Similar District`, NumEnroll))
 
 all_districts %>%
-    gather(institution_level, `Percent Enrolled`, -`Similar District`) %>%
-    ggplot(aes(x = `Similar District`, y = `Percent Enrolled`, fill = institution_level)) +
+      gather(institution_type, `Percent Enrolled`, -`Similar District`) %>%
+    ggplot(aes(x = `Similar District`, y = `Percent Enrolled`, fill = institution_type)) +
     geom_bar(stat = "identity", colour = "black") +
     geom_text(aes(label = all_districts_lab1$`Percent Enrolled`), vjust = 1, position = "stack") +
     annotate("text", x= all_districts_lab$`Similar District`, y=95, label = paste0("N=", all_districts_lab$`NumEnroll`)) +
@@ -262,22 +296,24 @@ all_districts[match(district_order, all_districts$`Similar District`), ] %>%
     knitr::kable()
 ```
 
+ \newpage
 
+### School-level Enrollment
 *   How does the overall enrollment differ across schools in my district?
 *   How does the distribution of students to different institution types compare across schools in my district? 
 
 ```{r Enrollment by School, fig.height = 5, fig.width = 8}
 
 StateRate3c <- dist %>% 
-    filter(page == "3c" & !is.na(institution_level) & cohortyear == 2011) %>%
-    select(pct_enroll_state, institution_level, schoolname)
+    filter(page == "3c" & institution_type!= "Did not enroll" & cohortyear == 2011) %>%
+    select(pct_enroll_state, institution_type, schoolname)
 
 dist %>%
-    filter(page == "3c" & !is.na(institution_level)) %>%
+    filter(page == "3c" & institution_type!= "Did not enroll") %>%
     mutate(ps_pct_enroll = if_else(hsgrad_denom >= 10, round(100 * enroll_bin/hsgrad_denom, 1), NaN),
         pctElab = as.factor(ifelse(ps_pct_enroll >= 5 | hsgrad_denom < 10, ps_pct_enroll, "*")), 
         Elab = as.factor(ifelse(hsgrad_denom < 10, "< 10", enroll_bin))) %>%
-    ggplot(aes(x = institution_level, y = ps_pct_enroll, fill = institution_level)) +
+    ggplot(aes(x = institution_type, y = ps_pct_enroll, fill = institution_type)) +
         geom_bar(stat = "identity", colour = "black", show.legend = FALSE) +
         geom_text(aes(label = paste0(pctElab, "%\n N=", Elab), vjust = -.5)) +
         theme_hc() +
@@ -286,139 +322,159 @@ dist %>%
             plot.title = element_text(family = "serif")) +
         facet_grid(. ~ schoolname) +
         scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595")) +
-        geom_text(data=StateRate3c, aes(y=95, x=StateRate3c$institution_level,
-            label = paste("TN:", StateRate3c$pct_enroll_state, "%", sep="")), fontface="italic") +
+        geom_text(data=StateRate3c, aes(y=95, x=StateRate3c$institution_type,
+            label = paste("TN: ", StateRate3c$pct_enroll_state, "%", sep="")), fontface="italic") +
         ylab("Percent of graduates who enrolled \n in any postsecondary institution") +
         xlab("Institution Type") +
         ggtitle("Postsecondary Enrollment by High School 2015 On-time Graduates") +
         ylim(0, 100)
 ```
 
-\newpage
+###Notes
+Use this space to record any thoughts or questions about the overall levels of postsecondary enrollment in your district. 
 
-## Most Common Institutions
-
-The following table shows the most common institutions that students from the 2015 graduating class enrolled in within 12 months of graduation.  
-
-Consider opportunities for an external partnership with the institution and where students have been successful. Some questions that you may want to consider:
-
-*   Are students enrolling in institutions that are nearest to your school? 
-*   Have students taken dual enrollment courses or attended summer programs  at these institutions while in high school?
-*   Are students in your school aware of the majors offered at these institutions? 
-*   Do your programs of study align with opportunities at these institutions?
-    
-```{r, echo = FALSE}
-# Do I want to show this by school?
-dist %>%
-    filter(page == "8" & enroll_bin >= 5 & !is.na(institution_level)) %>%
-    arrange(desc(enroll_bin)) %>%
-    slice(1:15) %>%
-    transmute(`Institution Name` = ps_institution_name, `Number of Enrollees` = enroll_bin) %>%
-    knitr::kable()
-```
-
-## SECTION II: Postsecondary Enrollment by Subgroup (Most recent year only)
+\newpage 
+## SECTION II: Postsecondary Enrollment by Subgroup
 
 #### Key Questions
-*   To what extent do we see overall equitable access by race  in the same school to postsecondary institutions? 
+*   To what extent do we see overall equitable access by race in the same school to postsecondary institutions? 
 *   Within each school, to what extent are students of different racial backgrounds enrolling in different types of postsecondary institutions (e.g. a higher distribution of one group is enrolling in four-year universities than two year institutions)? 
 *   If your district has more than one school, to what extent do the overall enrollment rates differ across schools in your districts for racial and ethnic groups?
 *   If your district has more than one school, to what extent do enrollment rates for racial and ethnic subggroups into different types of postecondary institutions differ across schools?
 *   Given this information, do you feel that all students are receiving the same opportunities in your district?
 
-```{r subgroup Enrollment, fig.height = 10, fig.align = "center"}
+```{r subgroup_enrollment, fig.height = 9, fig.align = "center"}
+subgroup_order <- dist %>%
+  filter(page %in% c("5a", "5c", "5e",  "5i")) %>% 
+    select(page,subgroup) %>%
+    as_data_frame() %>%
+    mutate(ordervar = if_else(grepl('Non',subgroup),1, 2)) %>% 
+  distinct() %>% 
+  arrange(page,desc(ordervar)) %>% 
+  select(-ordervar,-page) %>% 
+    magrittr::extract2(1)
 
+enr2015 <- dist %>%
+    filter(page == "3a" & cohortyear == 2011) %>% 
+    mutate(`Percent Enrolled` = enroll_bin/hsgrad) %>% 
+    distinct()
+
+sub2015 <-  dist %>%
+    filter(page %in% c("5a", "5c", "5e", "5i")) %>%
+  group_by(subgroup, schoolname) %>% 
+  summarise(`Percent Enrolled Total` = sum(pct_enroll),`Percent Enrolled State` = sum(pct_enroll_state), `N Subgroup`=sum(hsgrad)) 
+
+#Generate a new variable to create the "Did not enroll percentage"
 dist %>%
-    filter(page %in% c("5a", "5c", "5e", "5g", "5i")) %>%
-    ggplot(aes(x = subgroup, y = pct_enroll, fill = institution_level)) +
+    filter(page %in% c("5a", "5c", "5e", "5i")) %>%
+  mutate(new_enroll = if_else(enroll_bin!=0, enroll_bin, hsgrad), new_perc = round(100*new_enroll/hsgrad_denom,1),labPerc = as.character(if_else(new_perc<5,"" ,as.character(new_perc)))) %>%
+  group_by(schoolname, subgroup) %>% 
+    mutate(`Percent Enrolled` = sum(pct_enroll),`N Subgroup`=sum(hsgrad), `Percent Subgroup` = sum(new_perc)) %>% 
+    ggplot(aes(x = subgroup, y = new_perc, fill = institution_type)) +
         geom_bar(stat = "identity", color = "black") +
-        geom_text(aes(label = pctElab), vjust = 1, position = "stack") +
+        geom_text(aes(label = labPerc), vjust = 1.5, position = "stack") +
+        geom_text(aes(x=subgroup , y= `Percent Subgroup`, label= paste(`Percent Enrolled`,"% enrolled \n Total N=",`N Subgroup`, sep = "")), vjust= -.75) + 
+        geom_hline(aes(yintercept = 100*enr2015$`Percent Enrolled`), linetype =2) +
+   facet_grid(schoolname ~ .) +
         theme_hc() +
         theme(axis.text.y = element_text(family = "serif"),
             axis.text.x = element_text(hjust = .75, angle = 15, family = "serif", face = "bold"),
             plot.title = element_text(family = "serif")) +
-        facet_grid(schoolname ~ .) +
-        scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595", "black"),
+        scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595", "transparent"),
             limits = c("Four-year University", "Community College", "Technical College", "Did not enroll")) +
+      # annotate("text", x = "2014", y = enr2015$pct_enroll+5,
+      #       label = paste0("District Average Enrollment Rate"), fontface = "italic") +
         ylab("Percent of graduates who enrolled \n in any postsecondary institution in 2015") +
         xlab("Subgroup by School") +
+        scale_x_discrete(limits = subgroup_order) +
         ggtitle("Postsecondary Enrollment by Subgroup") +
-        ylim(0, 100)
+        ylim(0, 101)
 ```
 
-*    Economic Disadvantage (School level)  
-    +   To what extent do we see equitable access by level of economic disadvantage in my district to postsecondary institutions? Given this information, do you feel that all students are receiving the same opportunities in your district?
+<!-- *    Economic Disadvantage (School level)   -->
+<!--     +   To what extent do we see equitable access by level of economic disadvantage in my district to postsecondary institutions? Given this information, do you feel that all students are receiving the same opportunities in your district? -->
 
-```{r Figure5c, fig.height = 6, fig.width = 8}
-dist %>%
-    filter(page == "5c" & hsgrad_denom >= 10 & !is.na(institution_level)) %>%
-    ggplot(aes(x = econ_dis, y = pct_enroll, fill = as.factor(institution_level))) +
-        geom_bar(stat = "identity") +
-        geom_text(aes(label = pct_enroll), vjust = 1, position = "stack") +
-        theme_hc() +
-        theme(axis.text.y = element_text(family = "serif"),
-            axis.text.x = element_text(family = "serif", face = "bold"),
-            plot.title = element_text(family = "serif")) +
-        facet_grid(. ~ schoolname) +
-        scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595", "#000000")) +
-        ylab("Percent of graduates who enrolled \n in any postsecondary institution in 2015") +
-        xlab("Economic Disadvantage Status by School") +
-        ggtitle("Postsecondary Enrollment by Subgroup") +
-        ylim(0, 100)
-```
+<!-- ```{r ED Only, fig.height = 6, fig.width = 8, results='hide'} -->
+<!-- dist %>% -->
+<!--     filter(page == "5c" & hsgrad_denom >= 10 & institution_type!= "Did not enroll") %>% -->
+<!--     ggplot(aes(x = econ_dis, y = pct_enroll, fill = as.factor(institution_type))) + -->
+<!--         geom_bar(stat = "identity") + -->
+<!--         geom_text(aes(label = pct_enroll), vjust = 1, position = "stack") + -->
+<!--         theme_hc() + -->
+<!--         theme(axis.text.y = element_text(family = "serif"), -->
+<!--             axis.text.x = element_text(family = "serif", face = "bold"), -->
+<!--             plot.title = element_text(family = "serif")) + -->
+<!--         facet_grid(. ~ schoolname) + -->
+<!--         scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595", "#000000")) + -->
+<!--         ylab("Percent of graduates who enrolled \n in any postsecondary institution in 2015") + -->
+<!--         xlab("Economic Disadvantage Status by School") + -->
+<!--         ggtitle("Postsecondary Enrollment by Subgroup") + -->
+<!--         ylim(0, 100) -->
+<!-- ``` -->
 
 \newpage
 
-## Postsecondary Enrollment By Academic Achievement (Most recent year only)
+## SECTION III: Postsecondary Enrollment By Academic Achievement  
 
-#### Key Questions
+#### Key Questions  
 
-*   Consider the distribution of ACT composite scores for the students in your district.
-```{r Figure7aa, fig.height = 6, fig.width = 8}
+*   Consider the distribution of ACT composite scores for the students in your district.  
+    *   Students who score below a 17 often require learning support (remedial) courses in postsecondary.
+    *   Students below a 21 fall below the "college-ready" threshold and are not eligible for the Hope Scholarship.  
+    
+See Appendix for strategies to improve ACT performance and create a stronger postsecondary readiness culture in your school. 
+
+```{r ACT_distribution, fig.height = 6, fig.width = 8}
 dist %>%
     filter(page == "7a") %>%
     group_by(districtno, districtname, schoolname, schoolno, act_recode) %>%
-    summarise(`Number at ACT score` = max(hsgrad_denom)) %>%
-    group_by(schoolno) %>%
-    mutate(`Number Grads` = sum(`Number at ACT score`),
-        `Percent at ACT score` = round(100 * `Number at ACT score`/`Number Grads`, 1)) %>%
+    summarise(`Number at ACT score` = sum(hsgrad),`Number Grads` = max(hsgrad_denom)) %>%
+    # group_by(schoolno) %>%
+    # mutate(`Number Grads` = sum(`Number at ACT score`),
+    mutate(`Percent at ACT score` = round(100 * `Number at ACT score`/`Number Grads`, 1), labPerc = as.character(if_else(`Percent at ACT score`<5,"" ,as.character(`Percent at ACT score`)))) %>% 
     select(districtname, districtno, schoolno, schoolname, act_recode,
-        `Percent at ACT score`, `Number at ACT score`, `Number Grads`) %>%
+        `Percent at ACT score`,labPerc) %>%
     ggplot(aes(x = act_recode, y = `Percent at ACT score`, fill = act_recode)) +
-        geom_bar(stat = "identity") +
-        geom_text(aes(label = `Percent at ACT score`), vjust = -1, position = "stack") +
+        geom_bar(stat = "identity", color="black") +
+        geom_text(aes(label = paste(`Percent at ACT score`,"%", sep="")), vjust = -1, position = "stack") +
         theme_hc() +
         theme(axis.text.y = element_text(family = "serif"),
             axis.text.x = element_text(family = "serif", hjust = .5, angle = 15),
             plot.title = element_text(family = "serif")) +
         facet_grid(. ~ schoolname) +
-        scale_fill_manual(name = "ACT Composite Score", values = c("#2dccd3", "#5d7975", "#e02f11", "#24336b", "#959595")) +
+        scale_fill_manual(name = "ACT Composite Score", values = c("#fb8072", "#e87722","#5d7975", "#d2d755","#2dccd3" )) +
         ylab("Percent of graduates who scored at \n at different ACT score bands in 2015") +
         xlab("Students' Highest ACT Composite Score") +
         ggtitle("Distribution of ACT Composite Scores") +
         ylim(0, 100)
 ```
 
-*   Overall Enrollment By ACT Scores (State Comparison, District, and school level)
-The above figure displays the distribution of ACT scores. That group of students becomes the denominator for the next figure that shows postsecondary enrollment rates at each ACT score band. Thus, if a school had 50 students score between a 19-20, and 40 of those students enrolled in a postsecondary institution, the overall enrollment for that score band would be 80%.
-    +   To what extent do ACT Scores relate to the postsecondary enrollment of the students in my district? 
+\newpage
+
+#### Postsecondary Enrollment By ACT Scores  
+*   To what extent do ACT Scores relate to the postsecondary enrollment of the students in your district?  
+*   Is the percent of students who did not enroll in a postsecondary institution higher than you expected? 
+*   To what extent do the ACT scores relate to the type of postsecondary institution into which a student enrolled?  
 
 ```{r Figure7a, fig.height = 6, fig.width = 8}
 dist %>%
-    filter(page == "7a" & hsgrad_denom >= 5 & !is.na(institution_level)) %>%
-    ggplot(aes(x = act_recode, y = pct_enroll, fill = as.factor(institution_level))) +
-    geom_bar(stat = "identity") +
-    geom_text(aes(label = pct_enroll), vjust = 1, position = "stack") +
+    filter(page == "7a" & hsgrad_denom >= 5) %>%
+    mutate(new_enroll = if_else(enroll_bin!=0, enroll_bin, hsgrad), new_perc = round(100*new_enroll/hsgrad_denom,1),labPerc = as.character(if_else(new_perc<5,"" ,as.character(new_perc)))) %>% 
+  select(schoolname, institution_type,act_recode, pct_enroll, new_enroll, hsgrad, hsgrad_denom,new_perc,labPerc) %>%  
+    ggplot(aes(x = act_recode, y = new_perc, fill = institution_type)) +
+    geom_bar(stat = "identity", color="black") +
+    geom_text(aes(label = labPerc), vjust = 1, position = "stack") +
     theme_hc() +
     theme(axis.text.y = element_text(family = "serif"),
           axis.text.x = element_text(family = "serif", hjust = .5, angle = 15),
           plot.title = element_text(family = "serif")) +
     facet_grid(. ~ schoolname) +
-    scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595")) +
+    scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595", "white"), 
+                      limits=c("Four-year University", "Community College","Technical College", "Did not enroll")) +
     ylab("Percent of graduates who enrolled \n in any postsecondary institution in 2015") +
     xlab("Students' Highest ACT Composite Score") +
     ggtitle("Postsecondary Enrollment by ACT Score") +
-    ylim(0, 100)
+    ylim(0, 75)
 ```
     
 * Other possible questions    
@@ -427,9 +483,9 @@ dist %>%
     
 \newpage
 
-## Postsecondary Enrollment By Coursework  (Most recent year only)
+## Section IV: Postsecondary Enrollment By Coursework  
 
-#### Key questions
+#### Access to EPSOs (Early Postsecondary Opportunities)
 *   To what extent do all students have access to rigorous coursework that can result in early postsecondary credit in the 2011 graduating cohort who graduated in spring 2015? 
 
 ```{r Figure9a, fig.height = 6, fig.width = 8}
@@ -470,31 +526,34 @@ EPS_ANY %>%
             axis.text.x = element_text(family = "serif", hjust = .5, angle = 15),
             plot.title = element_text(family = "serif")) +
         facet_grid(. ~ schoolname) +
-        scale_fill_manual(name = "EPS course taking", values = c("#e02f11", "#24336b", "#959595")) +
+        scale_fill_manual(name = "EPS course taking", values = c("#e87722","#5d7975", "#d2d755")) +
         ylab("Percent of graduates who participated in EPS courses \n in 2015") +
         xlab("EPS course taken") +
         ggtitle("Percent of Grads who took Early Postsecondary Course") +
         ylim(0, 100)
 ```
 
+\newpage 
+
+#### EPS Access by subgroup
 *   To what extent does access to EPS courses differ by student race?
 
-```{r Figure9b, fig.height = 6, fig.width = 8}
+```{r Figure9b}
 
 epso1 <- dist %>%
     filter(page == "9b" & hsgrad >= 10) %>% 
     transmute(districtname, districtno, schoolno, schoolname, subgroup,
-        Percent = epso_new/hsgrad, `EPSO type` = "Any EPS")
+        Percent = epso_new/hsgrad_denom, `EPSO type` = "Any EPS")
   
 AP1 <- dist %>%
     filter(page == "9b" & hsgrad >= 10) %>%
     transmute(districtname, districtno, schoolno, schoolname, subgroup,
-        Percent = ap_stu/hsgrad, `EPSO type` = "AP Course")
+        Percent = ap_stu/hsgrad_denom, `EPSO type` = "AP Course")
 
 DE1 <- dist %>%
     filter(page == "9b" & hsgrad >= 10) %>%
     transmute(districtname, districtno, schoolno, schoolname, subgroup,
-        Percent = de_ever/hsgrad, `EPSO type` = "DE Course", `Number Grads` = hsgrad)
+        Percent = de_ever/hsgrad_denom, `EPSO type` = "DE Course", `Number Grads` = hsgrad)
     
 EPS_ANY1 <- bind_rows(epso1, AP1, DE1)
     
@@ -508,7 +567,7 @@ EPS_ANY1 %>%
             axis.text.x = element_text(family = "serif", hjust = .5, angle = 15),
             plot.title = element_text(family = "serif")) +
         facet_grid(. ~ schoolname) +
-        scale_fill_manual(name = "EPS course taking", values = c("#e02f11", "#24336b", "#959595")) +
+        scale_fill_manual(name = "EPS course taking", values = c("#e87722","#5d7975", "#d2d755")) +
         ylab("Percent of graduates who participated \n in EPS courses in 2015") +
         xlab("Race") +
         ggtitle("Percent of Grads who took Early Postsecondary Course") +
@@ -517,22 +576,22 @@ EPS_ANY1 %>%
 
 *   To what extent does this differ by the economic disadvantage status of the students? 
 
-```{r Figure9c, fig.height = 6, fig.width = 8}
+```{r Figure9c}
 
 epso2 <- dist %>%
     filter(page == "9c" & hsgrad >= 10) %>%
     transmute(districtname, districtno, schoolno, schoolname, econ_dis,
-        Percent = epso_new/hsgrad, `EPSO type` = "Any EPS")
+        Percent = epso_new/hsgrad_denom, `EPSO type` = "Any EPS")
 
 AP2 <- dist %>%
     filter(page == "9c" & hsgrad >= 10) %>%
     transmute(districtname, districtno, schoolno, schoolname, econ_dis,
-        Percent = ap_stu/hsgrad, `EPSO type` = "AP Course")
+        Percent = ap_stu/hsgrad_denom, `EPSO type` = "AP Course")
 
 DE2 <- dist %>%
     filter(page == "9c" & hsgrad >= 10) %>%
     transmute(districtname, districtno, schoolno, schoolname, econ_dis,
-        Percent = de_ever/hsgrad, `EPSO type` = "DE Course", `Number Grads` = hsgrad)
+        Percent = de_ever/hsgrad_denom, `EPSO type` = "DE Course", `Number Grads` = hsgrad)
 
 EPS_ANY2 <- bind_rows(epso2, AP2, DE2)
 
@@ -546,28 +605,30 @@ EPS_ANY2 %>%
             axis.text.x = element_text(family = "serif", hjust = .5, angle = 15),
             plot.title = element_text(family = "serif")) +
         facet_grid(. ~ schoolname) +
-        scale_fill_manual(name = "EPS course taking", values = c("#e02f11", "#24336b", "#959595")) +
+        scale_fill_manual(name = "EPS course taking", values = c("#e87722","#5d7975", "#d2d755")) +
         ylab("Percent of graduates who participated \n in EPS courses in 2015") +
         xlab("Economic Disadvantage Status") +
         ggtitle("Percent of Grads who took Early Postsecondary Course") +
         ylim(0, 100)
 ```
 
+\newpage
+#### Postseconary Enrollment for EPS Students
 *   To what extent do students who took EPS courses enroll in a postsecondary institution?
 *   To what extent do students who took EPS courses enroll in different types of postsecondary institutions?
 
-```{r Figure9d, fig.height = 5, fig.width = 8}
+```{r Figure9d, fig.height = 4.25, fig.width = 6}
 dist %>%
     filter(page == "9d") %>%
     group_by(schoolno, epso_new) %>%
     mutate(`Number Grads` = sum(hsgrad)) %>%
-    filter(`Number Grads` >= 10 & !is.na(institution_level)) %>%
+    filter(`Number Grads` >= 10 & institution_type!= "Did not enroll") %>%
     ungroup() %>%
-    transmute(districtname, districtno, schoolno, schoolname, institution_level,
+    transmute(districtname, districtno, schoolno, schoolname, institution_type,
         EPS_cat = ifelse(epso_new == 1, "EPS", "No EPS"),
         `Percent Enroll` = round(100 * enroll_bin / `Number Grads`, 1),
         `Number Grads`) %>%
-    ggplot(aes(x = EPS_cat, y = `Percent Enroll`, fill = institution_level)) +
+    ggplot(aes(x = EPS_cat, y = `Percent Enroll`, fill = institution_type)) +
         geom_bar(stat = "identity") +
         geom_text(aes(label = `Percent Enroll`), vjust = 1, position = "stack") +
         theme_hc() +
@@ -575,7 +636,8 @@ dist %>%
             axis.text.x = element_text(family = "serif", hjust = .5, angle = 15),
             plot.title = element_text(family = "serif")) +
         facet_grid(. ~ schoolname) +
-        scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595")) +
+        scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595", "white"), 
+                      limits=c("Four-year University", "Community College","Technical College", "Did not enroll")) +
         ylab("Percent of graduates who enrolled in a \n PS institution by EPS in 2015") +
         xlab("Whether Student took EPS course") +
         ggtitle("Postsecondary Enrollment by EPS coursetaking") +
@@ -586,16 +648,16 @@ Research by the department has seen increases in postsecondary enrollment for ED
 
 * To what extent do Economically Disadvantaged students benefit from EPS courses?
 
-```{r Figure9e, fig.height = 5, fig.width = 8}
+```{r Figure9e, fig.height = 4.25, fig.width = 6}
 dist %>%
     filter(page == "9e") %>%
     group_by(schoolno, epso_frpl_cat) %>%
     mutate(`Number Grads` = sum(hsgrad)) %>%
-    filter(`Number Grads` >= 10 & !is.na(institution_level)) %>%
+    filter(`Number Grads` >= 10 & institution_type!= "Did not enroll") %>%
     ungroup() %>%
-    transmute(districtname, districtno, schoolno, schoolname, institution_level, epso_frpl_cat,
+    transmute(districtname, districtno, schoolno, schoolname, institution_type, epso_frpl_cat,
         `Percent Enroll` = round(100 * enroll_bin / `Number Grads`, 1), `Number Grads`) %>%
-    ggplot(aes(x = epso_frpl_cat, y = `Percent Enroll`, fill = institution_level)) +
+    ggplot(aes(x = epso_frpl_cat, y = `Percent Enroll`, fill = institution_type)) +
         geom_bar(stat = "identity") +
         geom_text(aes(label = `Percent Enroll`), vjust = 1, position = "stack") +
         theme_hc() +
@@ -603,7 +665,8 @@ dist %>%
             axis.text.x = element_text(family = "serif", hjust = .5, angle = 15),
             plot.title = element_text(family = "serif")) +
         facet_grid(. ~ schoolname) +
-        scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595")) +
+        scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595", "white"), 
+                      limits=c("Four-year University", "Community College","Technical College", "Did not enroll")) +
         ylab("Percent of graduates who enrolled in a \n PS institution by EPS in 2015") +
         xlab("Whether Student took EPS course, \n by Economic Disadvantage status") +
         ggtitle("Postsecondary Enrollment by EPS coursetaking") +
