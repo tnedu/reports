@@ -131,7 +131,7 @@ dist %>%
 
 \newpage 
 
-\newpage
+\newpage  
 
 ### Definitions  
 
