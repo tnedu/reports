@@ -22,7 +22,6 @@ library(extrafont)
 library(extrafontdb)
 library(ggthemes)
 library(haven)
-library(reshape2)
 
 dist <- read_csv("K:/Research and Policy/projects/hs_feedback_report/Derived Data File/Mock District Data 20170412.csv") %>%
     filter(districtno == 350) %>%
@@ -69,7 +68,7 @@ stategradrate<- gradcohort %>%
   summarise_all(funs(mean)) %>% summarise_at(vars(3:7), funs(percent)) %>% 
   as_data_frame()
 
-dorder<-c("District Name" "Graduation Rate", "% BHN","% ED", "% SWD", "% EL", "Avg. ACT (Highest)", "% EPSO") %>%
+dorder<-c("District Name" "Graduation\n Rate", "% BHN","% ED", "% SWD", "% EL", "Avg. ACT \n (Highest)", "% EPSO") %>%
     as_data_frame()
 
 epso_cov <- dist %>%
@@ -87,13 +86,13 @@ gradcohort %>%
   filter(`Completion type`==1) %>% 
   transmute(`N in Cohort`, `N Graduates` = n_distinct(`Student key`), 
             `Graduation Rate` = `N Graduates`/`N in Cohort`, 
-            `% CTE` = if_else(`Cte` == "Y", 1,0),
+            `% CTE` = if_else(Cte = "Y", 1,0),
             `% BHN` = if_else(`Race b` == "Y" | `Race i` == "Y" | `Ethnicity` == "H", 1,0), 
             `% ED` =if_else(`Econ dis`=="Y",1,0), 
             `% EL` = if_else(Ell == "Y", 1,0), 
             `% SWD` = if_else(Sped =="Y",1,0)) %>%
-  summarise_all(funs(mean)) %>% summarise_at(vars(3:8), funs(percent)) %>% bind_cols(epso_cov, act_dist) %>% mutate(`District Name`=districtname) %>%
-  select(`District Name`,`Graduation Rate`, `% CTE`, `% BHN`,`% ED`, `% SWD`, `% EL`, `Avg. ACT (Highest)`, `% EPSO`) %>%  knitr::kable(col.names = c("District Name","Graduation Rate", "% CTE", "% BHN","% ED", "% SWD", "% EL", "Avg. ACT (Highest)", "% EPSO"),align="lrrrrrrrr", caption="2015 Graduates")
+  summarise_all(funs(mean)) %>% summarise_at(vars(3:7), funs(percent)) %>% bind_cols(epso_cov, act_dist) %>% mutate(`District Name`=districtname) %>%
+  select(`District Name`,`Graduation Rate`, `% CTE`, `% BHN`,`% ED`, `% SWD`, `% EL`, `Avg. ACT (Highest)`, `% EPSO`) %>%  knitr::kable(col.names = c("District Name","Graduation Rate", "% CTE", "% BHN","% ED", "% SWD", "% EL", "Avg. ACT (Highest)", "% EPSO"),align="lccccccc", caption="2015 Graduates")
 ```
 *   Percent of most recent graduates who enrolled in any postsecondary institution
 ```{r `District by Type P1`, fig.height=3.5,  fig.align = 'center'}
@@ -122,6 +121,8 @@ dist %>%
         ylim(0, 100)
 ```
 *   Percent of most recent graduates who enrolled in any postsecondary institution, by type of PS institution
+*   Percent of most recent graduates concentrating in CTE
+*   Average ACT scores
 <!-- *   Regional Alignment of Program of Studies available -->
 
 **Top Five Most Common Insitutions**
@@ -135,8 +136,7 @@ dist %>%
     knitr::kable()  
 ```
 
-\newpage 
-
+## Overview of what we want to show.
 \newpage
 
 ### Definitions  
@@ -157,10 +157,8 @@ For some topics, comparing a school district's data to statewide trends is not i
 |`r districtname`| `r comp1` | `r comp2` | `r comp3` | `r comp4` | `r comp5` |
 
 \newpage
-## SECTION I: Postsecondary Enrollment 
-
-### Postsecondary Enrollment over time
-  *   What are the general enrollment trends in my district? Have these percentages changed over time? 
+#### Key questions  
+*   What are the general enrollment trends in my district?  
 ```{r Enrollment over time, fig.height = 3.75, fig.width = 6, fig.align = 'center'}
 
 StateRate <- dist %>%
@@ -188,7 +186,7 @@ dist %>%
         ggtitle("Postsecondary Enrollment by Graduation Year") +
         ylim(0, 100)
 ```
-*   What type of institutions are my students enrolling in?  
+*   What type of institutions are my students enrolling in?
 ```{r District by Type, fig.height = 3.75, fig.width = 6, fig.align = 'center'}
 StateRate3b <- dist %>%
     filter(page == "3b" & institution_type!= "Did not enroll" & cohortyear == 2011) %>%
@@ -223,7 +221,7 @@ The following table shows the most common institutions that students from the 20
 Consider opportunities for an external partnership with the institution and where students have been successful. Some questions that you may want to consider:
 
 *   Are students enrolling in institutions that are nearest to your school? 
-*   Have students taken dual enrollment courses or attended summer programs at these institutions while in high school?
+*   Have students taken dual enrollment courses or attended summer programs  at these institutions while in high school?
 *   Are students in your school aware of the majors offered at these institutions? 
 *   Do your programs of study align with opportunities at these institutions?  
 ```{r most_common_institutions, echo = FALSE}
@@ -248,11 +246,13 @@ dist %>%
 
 \newpage 
 
-### District Comparisons  
-*   How does the overall enrollment compare to similar districts in terms of overall postsecondary enrollment?  
-*   How does the overall enrollment compare to the state overall enrollment (First and last bars)?  
-*   How does the enrollment into different institution types compare to similar districts in terms of overall postsecondary enrollment?  
-*   How does the enrollment into different institution types compare to the state distribution of enrollment into institution types (First and last bars)?  
+### District Comparisons
+
+#### Key Questions
+*   How does the overall enrollment compare to similar districts in terms of overall postsecondary enrollment?
+*   How does the overall enrollment compare to the state overall enrollment?
+*   How does the enrollment into different institution types compare to similar districts in terms of overall postsecondary enrollment?
+*   How does the enrollment into different institution types compare to the state distribution of enrollment into institution types?
 
 ```{r comparison_districts}
 district_order <- dist %>%
@@ -362,9 +362,9 @@ all_districts[match(district_order, all_districts$`Similar District`), ] %>%
 
  \newpage
 
-### School-level Enrollment  
-*   How do the overall enrollment rates differ across schools in my district?
-*   How does the distribution of students to different institution types compare across schools in my district?  
+### School-level Enrollment
+*   How does the overall enrollment differ across schools in my district?
+*   How does the distribution of students to different institution types compare across schools in my district? 
 
 ```{r Enrollment by School, fig.height = 5, fig.width = 8}
 
@@ -394,13 +394,13 @@ dist %>%
         ylim(0, 100)
 ```
 
-### **Notes**  
+###Notes
 Use this space to record any thoughts or questions about the overall levels of postsecondary enrollment in your district. 
 
 \newpage 
 ## SECTION II: Postsecondary Enrollment by Subgroup
 
-### Subgroup comparisons
+#### Key Questions
 *   To what extent do we see overall equitable access by race in the same school to postsecondary institutions? 
 *   Within each school, to what extent are students of different racial backgrounds enrolling in different types of postsecondary institutions (e.g. a higher distribution of one group is enrolling in four-year universities than two year institutions)? 
 *   If your district has more than one school, to what extent do the overall enrollment rates differ across schools in your districts for racial and ethnic groups?
@@ -458,16 +458,6 @@ dist %>%
         ggtitle("Postsecondary Enrollment by Subgroup") +
         ylim(0, 101)
 
-all_subgroups <- dist %>%
-    filter(page %in% c("5a", "5c", "5e", "5i")) %>%
-    group_by(schoolname,subgroup) %>%  mutate(`N Subgroup` = sum(hsgrad)) %>%  ungroup() %>% 
-  mutate(new_enroll = if_else(enroll_bin!=0, enroll_bin, hsgrad), new_perc = round(100*new_enroll/hsgrad_denom,1),labPerc = as.character(if_else(`N Subgroup` < 10,"***" ,as.character(new_perc))), `N Subgroup` = as.character(if_else(`N Subgroup` <10 ,"<10 Students" ,as.character(`N Subgroup`)))) %>%
-  select(schoolname, subgroup, institution_type, `N Subgroup`, labPerc) %>%
-  dcast(schoolname + subgroup + `N Subgroup` ~ institution_type)  %>% 
-  arrange(schoolname) %>% rename(`School Name`=schoolname, `Subgroup`=subgroup)
-  
-
-all_subgroups[match(subgroup_order, all_subgroups$Subgroup),]   %>%  knitr::kable()
 ```
 
 <!-- *    Economic Disadvantage (School level)   -->
