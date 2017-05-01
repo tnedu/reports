@@ -37,10 +37,12 @@ sankey <- read_csv("K:/Research and Policy/projects/hs_feedback_report/Derived D
   mutate(HS_Grad_Enroll = sum(hsgrad)) %>% 
   ungroup() %>% 
   mutate(institution_type = ordered(institution_level, 
-                                    levels = c("Four-year University", "Community College", "Technical College", "Did not enroll"))) %>%
-      select(act_recode, institution_type, HS_Grad_Score, HS_Grad_Enroll) %>%  
-  distinct(act_recode, institution_type, HS_Grad_Score, HS_Grad_Enroll) %>%
-  arrange(act_recode, desc(institution_type)) 
+                                    levels = c("Four-year University", "Community College", "Technical College", "Did not enroll")),
+         ACT_score = ordered(act_recode, 
+                                    levels = c("0-15", "16-18", "19-20", "21-26","27-36"))) %>%
+      select(ACT_score, institution_type, HS_Grad_Score, HS_Grad_Enroll) %>%  
+  distinct(ACT_score, institution_type, HS_Grad_Score, HS_Grad_Enroll) %>%
+  arrange(ACT_score, desc(institution_type)) 
 
 attach(sankey)
 E(g)$weights<- c(HS_Grad_Score[1], 
@@ -114,3 +116,53 @@ if
 
 sankeyPlot
 
+
+sankeyPlot$setTemplate(
+  afterScript = "
+  <script>
+  
+  var cscale = d3.scale.ordinal()
+  .domain(['N','E', 'G' ,'I','T','N ','E ', 'G ' ,'I ','T '])
+  .range(['#d3d3d3', '#32ca32', '#1f78b4', '#e31a1c','#ecd736','#d3d3d3',    
+                     '#32ca32', '#1f78b4', '#e31a1c','#ecd736'])
+  
+  
+  
+  d3.selectAll('#{{ chartId }} svg path.link')
+    .style('stroke', function(d){
+    return cscale(d.source.name);
+    //returns grey links
+  })
+  
+  d3.selectAll('#{{ chartId }} svg .node rect')
+     .style('fill', function(d){
+     return cscale(d.name)
+  })
+  .style('stroke', 'none')
+  
+  var text_box = d3.selectAll('#{{ chartId }}').append('svg')
+  .attr('width', 500)
+  .attr('height', 100)
+  
+  var TextData = [
+  { 'cx': 0, 'cy': 20 ,'label': 'High School Grads', 'pos': 'left'},
+  { 'cx': 250, 'cy': 20,'label': 'ACT SCore','pos': 'middle'},
+  { 'cx': 500, 'cy': 20, 'label': 'PS Enrollment','pos': 'end'}];
+  
+  var text = text_box.selectAll('text')
+  .data(TextData)
+  .enter()
+  .append('text');
+  
+  //Add the text attributes
+  var textLabels = text
+  .attr('x', function(d) { return d.cx; })
+  .attr('y', function(d) { return d.cy; })
+  .text( function (d) { return d.label ; })
+  .attr('text-anchor', function(d) { return d.pos ;})
+  .attr('font-family', 'sans-serif')
+  .attr('font-size', '14px')
+  .attr('fill', 'black');
+  
+  </script>
+  ")
