@@ -10,6 +10,8 @@ geometry: margin = .75in
 fontfamily: mathpazo
 fontsize: 11pt
 spacing: double
+# header-includes:
+#     \usepackage{graphicx}
 # reference_docx: ./Footemp.docx
 ---
 ```{r setup, include = FALSE}
@@ -54,8 +56,6 @@ act_dist <- read_csv("K:/Research and Policy/projects/hs_feedback_report/Derived
 
 \begin{center}
 \textbf{Postsecondary and Workforce Readiness Reports}
-
-
 \textbf{`r print(districtname)`}
   
 \textbf{\textit{Overview: 2015 On-Time Graduates}}
@@ -80,8 +80,6 @@ epso_cov <- dist %>%
     ungroup() %>%
     transmute(`% EPSO` = percent(`Number who took EPSO` / `Number Grads`))
 
-
-
 gradcohort %>%
     filter(`District no` == 350 & `Included in cohort` == "Y") %>%
     mutate(`N in Cohort` = n_distinct(`Student key`)) %>% 
@@ -93,35 +91,55 @@ gradcohort %>%
             `% ED` =if_else(`Econ dis`=="Y",1,0), 
             `% EL` = if_else(Ell == "Y", 1,0), 
             `% SWD` = if_else(Sped =="Y",1,0)) %>%
-  summarise_all(funs(mean)) %>% summarise_at(vars(3:8), funs(percent)) %>% bind_cols(epso_cov, act_dist) %>% mutate(`District Name`=districtname) %>%
-  select(`District Name`,`Graduation Rate`, `% CTE`, `Avg. ACT (Highest)`, `% EPSO`, `% BHN`,`% ED`, `% SWD`, `% EL`) %>%  knitr::kable(col.names = c("District Name","Grad. Rate", "% CTE", "Avg. ACT", "% EPSO", "% BHN","% ED", "% SWD", "% EL"),align="lrrrrrrrr", caption="2015 Graduates")
+  summarise_all(funs(mean)) %>% summarise_at(vars(3:8), funs(percent)) %>% bind_cols(epso_cov, act_dist) %>% mutate(`District Name`=districtname) %>% 
+    select(`District Name`,`Graduation Rate`,  `Avg. ACT (Highest)`, `% EPSO`, `% CTE`,`% BHN`,`% ED`, `% SWD`, `% EL`)  %>%  knitr::kable(longtable = TRUE, col.names = c("District Name","Grad. Rate", "Avg. ACT", "% EPSO", "% CTE", "% BHN","% ED", "% SWD", "% EL"),align="lrrrrrrrr" )
 ```
 
-```{r `District by Type P1`, fig.height=3.5,  fig.align = 'center'}
+```{r `District by Type P1`, fig.height=3,  fig.align = 'center'}
 StateRate3b <- dist %>%
-    filter(page == "3b" & institution_type!= "Did not enroll" & cohortyear == 2011) %>%
-    select(pct_enroll_state, institution_type)
+    filter(page == "3b" & institution_type!= "Did not enroll") %>%
+    select(pct_enroll_state, institution_type, cohortyear) %>% 
+    mutate(districtname = "Tennessee") %>% mutate(ps_pct_enroll= round(pct_enroll_state,0) ) %>% select(cohortyear, districtname, institution_type, ps_pct_enroll)
+   
 
 dist %>%
     filter(page == "3b" & institution_type!= "Did not enroll") %>%
-    mutate(ps_pct_enroll = round(100 * enroll_bin/hsgrad_denom, 1)) %>%
-    mutate(pctElab = as.factor(ifelse(ps_pct_enroll>= 5, ps_pct_enroll, "*")),
-        Elab = as.factor(ifelse(hsgrad < 10, "< 10",enroll_bin))) %>%
-    ggplot(aes(x = institution_type, y = ps_pct_enroll, fill = institution_type)) +
-        geom_bar(stat = "identity", position = position_dodge(-1), width = .75, colour="black", show.legend = FALSE) +
-        geom_text(aes(label = paste0(pctElab, "%\n N=", Elab), vjust = -.5)) +
-        theme_hc() +
+    mutate(ps_pct_enroll = round(100 * enroll_bin/hsgrad_denom, 0)) %>%
+    select(cohortyear, districtname, institution_type, ps_pct_enroll) %>% 
+    bind_rows(StateRate3b) %>% arrange(districtname, desc(cohortyear), desc(institution_type)) %>% 
+  group_by(districtname,cohortyear) %>% 
+  mutate(`Total Enrollment` = sum(ps_pct_enroll ), `Cumulative Enrollment` = cumsum(ps_pct_enroll)) %>% 
+  ungroup() %>% 
+  mutate(pctElab = as.factor(ifelse(ps_pct_enroll>= 10, paste0(`ps_pct_enroll`, "%", sep = ""), ""))) %>%
+    ggplot(aes(x =districtname, y = ps_pct_enroll, fill = institution_type)) +
+        geom_col(position = "stack", width = .75, colour="black") +
+        facet_wrap(~ as.factor(cohortyear)) + 
+        geom_text(aes( x= districtname, y = `Cumulative Enrollment`,label = pctElab, vjust=1), size = 2.5) +
+       theme_hc() +
         theme(axis.text.y = element_text(family = "serif"),
             axis.text.x = element_text( family = "serif"),
-            plot.title = element_text(family = "serif")) +
+            plot.title = element_text(family = "serif"),
+            legend.position = "top",
+            legend.margin=margin(t = 0, unit='cm')) +
         scale_fill_manual(name = "Institution Type", values = c("#e02f11", "#24336b", "#959595")) +
-        annotate("text", x = StateRate3b$institution_type, y = 95,
-            label = paste("TN:", StateRate3b$pct_enroll_state, "%"), fontface="italic") +
+      geom_text(aes(x = districtname, y = 90,
+             label = paste("Overall: \n", `Total Enrollment`, "%", sep = "")), size = 3, fontface="italic") +
         ylab("Percent of HS graduates enrolled") +
-        xlab("Institution Type") +
-        ggtitle("Postsecondary Enrollment by Institution Type: 2015 On-time Graduates") +
-        ylim(0, 100)
+        xlab("") +
+                ylim(0, 100)
+
 ```
+\begin{center}
+\textit{ACT into Postsecondary}
+\end{center}
+![](K:/Research and Policy/projects/reports/ACT Sankey Hardeman.png)
+<!-- \begin{center} -->
+<!-- \begin{figure}[Sankey] -->
+<!--     \centering -->
+<!--       \includegraphics[width=90mm]{"K:/Research and Policy/projects/reports/ACT Sankey Hardeman.png"} -->
+<!--     \caption{ACT into Postsecondary \label{overflow}} -->
+<!--     \end{figure} -->
+<!-- \end{center} -->
 \begin{center}
 \textit{Top Five Insitutions}
 \end{center}
@@ -141,16 +159,16 @@ dist %>%
 
 ### Definitions  
 
-**Graduation Year**: This report uses the term Graduation Year to monitor a cohort of students. This set of graduates would align with the On-Time Graduates with a regular diploma, based on when the group of students entered high school. For example, this report provides data on the 2011 freshman cohort, which is a group of students who entered high school in the fall of 2011. The vast majority of these students graduated in the spring of 2015. The most recent postsecondary enrollment data available is for the 2015 graduates fromn the 2011 freshman cohor. 
+**Graduation Year**: This report uses the term Graduation Year to align with the On-Time Graduates with a regular diploma, based on when the group of students entered high school. 
 
-**Postsecondary Enrollment**: A student is identified as having enrolled in a postsecondary institution if they enroll within 12 months of expectred graduation year for students in the 2011 ninth grade cohort. Eligible institutions include Tennessee Board of Regents' schools, UT System, Tennessee Colleges of Applied Technology, TICUA institutions, and any non-Tennessee institution that shares enrollment information with the National Student Clearinghouse. 
+**Postsecondary Enrollment**: A student is identified as having enrolled in a postsecondary institution if they enroll within 12 months of graduation. Ninety-eight percent of schools nationwide report enrollments.
 
 **Postsecondary Remediation**: A student is identified as being assigned to a remedial course if they are designated as having non-zero remedial hours by their postsecondary institution. This information is only available from Tennessee public postsecondary institutions. At this time, the data are not able to be disaggregated at the subject level (e.g. we are unable to see whether a student took a remedial course in English or Math).
 
-**Postsecondary Completion**: Postsecondary completion documentation is shown for students in the 2007 and 2008 ninth grade graduating cohorts. Any degree-granting public institution that submits completion information to THEC or to NSC [add link] is included in this set of data points. For students in the 2007 ninth grade cohort, we display a 5 year completion rate and for students in the 2008 ninth grade cohort, we show a 4 year completion rate. As of `r format(Sys.time(), '%B %d, %Y')`, the most recent term with completion information available is Summer 2016. A student's most advanced degree is shown. 
+**Postsecondary Completion**: Postsecondary completion documentation is shown for students in the 2007 and 2008 ninth grade graduating cohorts. Any degree-granting public institution that submits completion information to THEC or to NSC [add link] is included in this set of data points. As of `r format(Sys.time(), '%B %d, %Y')`, the most recent term with completion information available is Summer 2016. A student's most advanced degree is shown. 
 
 ### District comparisons  
-For some topics, comparing a school district's data to statewide trends is not illuminating because the characteristics of the district's student population are very different from the characteristics of the student population across Tennessee. For ACT and postsecondary enrollment data, this report provides comparisons to Tennessee school districts whose populations share similar demographic characteristics. Be respectful in your use of other school districts' information; do not share this information publicly.
+This report provides comparisons to Tennessee school districts whose populations share similar demographic characteristics. Be respectful in your use of other school districts' information; do not share this information publicly.
 
 |Your District | Comparison 1 | Comparison 2 | Comparison 3 | Comparison 4 | Comparison 5 |
 |:-------------|:---------:|:---------:|:---------:|:---------:|:---------:|

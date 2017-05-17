@@ -4,6 +4,7 @@ library(dplyr)
 library(tidyr)
 library(ggthemes)
 library(reshape2)
+library(tidyverse)
 
 nodes = c("High School Graduates",
           "ACT 0-15",
